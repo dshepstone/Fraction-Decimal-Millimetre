@@ -35,10 +35,16 @@ const STYLES = `
 .br-title b{color:var(--amber);font-weight:700;}
 .br-sub{color:var(--steel);font-size:13px;letter-spacing:.01em;max-width:52ch;}
 
-/* layout */
+/* layout — converter + quick reference stack on the left, tall rule on the right */
 .br-grid{max-width:940px;margin:0 auto;display:grid;gap:16px;
-  grid-template-columns:1fr 190px;align-items:stretch;}
-@media(max-width:720px){.br-grid{grid-template-columns:1fr;}}
+  grid-template-columns:1fr 214px;grid-template-rows:auto auto;align-items:start;}
+.br-converter{grid-column:1;grid-row:1;}
+.br-rule-card{grid-column:2;grid-row:1 / span 2;position:sticky;top:16px;}
+.br-grid .br-table-card{grid-column:1;grid-row:2;max-width:none;margin:0;}
+@media(max-width:720px){
+  .br-grid{grid-template-columns:1fr;grid-template-rows:none;}
+  .br-converter,.br-rule-card,.br-grid .br-table-card{grid-column:1;grid-row:auto;position:static;}
+}
 .br-card{background:var(--panel);border:1px solid var(--hair);border-radius:14px;
   padding:20px;position:relative;}
 .br-card-label{position:absolute;top:12px;right:14px;font-size:10px;color:var(--steel-dim);}
@@ -95,7 +101,7 @@ const STYLES = `
 /* rule */
 .br-rule-card{padding:14px 8px;display:flex;flex-direction:column;align-items:center;}
 .br-rule-card .br-card-label{right:12px;}
-.br-rule-svg{width:100%;max-width:170px;height:auto;display:block;touch-action:none;
+.br-rule-svg{width:100%;max-width:200px;height:auto;display:block;touch-action:none;
   cursor:ns-resize;outline:none;}
 .br-rule-svg:focus-visible{filter:drop-shadow(0 0 3px var(--amber));}
 .br-rule-hint{font-size:10px;color:var(--steel-dim);text-align:center;margin-top:8px;line-height:1.4;}
@@ -174,21 +180,33 @@ const REF = ["0","1/64","1/32","3/64","1/16","5/64","3/32","7/64","1/8","5/32",
     return { label, inches: n / d };
   });
 
-/* ------- rule geometry ------- */
-const VB_W = 150, VB_H = 680, TOP = 24, BOT = 656, SPAN = BOT - TOP;
-const BLADE_X0 = 66, BLADE_X1 = 128;
+/* ------- rule geometry -------
+ * Dual scale: inch/64ths grow leftward from the right blade edge,
+ * millimetres grow rightward from the left blade edge. The blade spans
+ * exactly 0–1 in, i.e. 0–25.4 mm. */
+const VB_W = 210, VB_H = 780, TOP = 30, BOT = 752, SPAN = BOT - TOP;
+const BLADE_X0 = 50, BLADE_X1 = 176, CENTER = 113;
+const INCH_LBL_X = CENTER + 30;   // right-aligned inch fraction labels
+const MM_LBL_X = CENTER - 29;     // left-aligned millimetre labels
 const yOf = (frac) => TOP + frac * SPAN;
-function tickLen(i) {
-  if (i % 64 === 0) return 48;
-  if (i % 32 === 0) return 39;
-  if (i % 16 === 0) return 31;
-  if (i % 8 === 0) return 24;
-  if (i % 4 === 0) return 17;
-  if (i % 2 === 0) return 11;
-  return 6;
+
+function inchTickLen(i) {
+  if (i % 64 === 0) return 31;
+  if (i % 32 === 0) return 26;
+  if (i % 16 === 0) return 21;
+  if (i % 8 === 0) return 16;
+  if (i % 4 === 0) return 11;
+  if (i % 2 === 0) return 7;
+  return 4;
+}
+function mmTickLen(i) {
+  if (i % 10 === 0) return 32;   // whole centimetre
+  if (i % 5 === 0) return 21;
+  return 11;
 }
 const EIGHTHS = [[0,"0"],[8,"1/8"],[16,"1/4"],[24,"3/8"],[32,"1/2"],
   [40,"5/8"],[48,"3/4"],[56,"7/8"],[64,"1"]];
+const MM_LABELS = [0, 5, 10, 15, 20, 25];
 
 /* ================================================================== */
 export default function BenchRule() {
@@ -260,7 +278,7 @@ export default function BenchRule() {
 
       <div className="br-grid">
         {/* converter */}
-        <section className="br-card">
+        <section className="br-card br-converter">
           <span className="br-card-label br-cap">Readout</span>
 
           <div className="br-readout">
@@ -325,33 +343,59 @@ export default function BenchRule() {
             onPointerDown={onPointerDown} onPointerMove={onPointerMove}
             onPointerUp={onPointerUp} onPointerCancel={onPointerUp} onKeyDown={onKey}>
 
+            {/* scale headers */}
+            <text x={MM_LBL_X} y="17" textAnchor="start"
+              fontFamily="Oswald, sans-serif" fontSize="9" fontWeight="600"
+              letterSpacing="0.12em" fill="var(--steel)">MM</text>
+            <text x={INCH_LBL_X} y="17" textAnchor="end"
+              fontFamily="Oswald, sans-serif" fontSize="9" fontWeight="600"
+              letterSpacing="0.12em" fill="var(--steel)">IN</text>
+
             {/* blade */}
             <rect x={BLADE_X0} y={TOP - 10} width={BLADE_X1 - BLADE_X0} height={SPAN + 20}
               rx="7" fill="var(--blade)" />
             <rect x={BLADE_X0} y={TOP - 10} width="6" height={SPAN + 20} fill="rgba(0,0,0,0.10)" />
+            {/* centre spine dividing the two scales */}
+            <line x1={CENTER} y1={TOP - 4} x2={CENTER} y2={BOT + 4}
+              stroke="rgba(0,0,0,0.12)" strokeWidth="1" />
 
-            {/* graduations */}
+            {/* inch graduations (right) */}
             {Array.from({ length: 65 }, (_, i) => {
               const y = yOf(i / 64);
-              const len = tickLen(i);
-              return <line key={i} x1={BLADE_X1 - len} y1={y} x2={BLADE_X1} y2={y}
+              const len = inchTickLen(i);
+              return <line key={`in${i}`} x1={BLADE_X1 - len} y1={y} x2={BLADE_X1} y2={y}
                 stroke="#171717" strokeWidth={i % 8 === 0 ? 1.6 : 0.9} />;
             })}
-            {/* eighth labels on blade */}
             {EIGHTHS.map(([i, lbl]) => (
-              <text key={lbl} x={BLADE_X0 + 6} y={yOf(i / 64) + 3.2}
+              <text key={`inl${lbl}`} x={INCH_LBL_X} y={yOf(i / 64) + 3.2} textAnchor="end"
                 fontFamily="Oswald, sans-serif" fontSize="9" fontWeight="600" fill="#171717">{lbl}</text>
             ))}
 
-            {/* active marker */}
+            {/* millimetre graduations (left) */}
+            {Array.from({ length: 26 }, (_, i) => {
+              const y = yOf(i / MM);
+              const len = mmTickLen(i);
+              return <line key={`mm${i}`} x1={BLADE_X0} y1={y} x2={BLADE_X0 + len} y2={y}
+                stroke="#171717" strokeWidth={i % 10 === 0 ? 1.6 : 0.9} />;
+            })}
+            {MM_LABELS.map((i) => (
+              <text key={`mml${i}`} x={MM_LBL_X} y={yOf(i / MM) + 3.2} textAnchor="start"
+                fontFamily="Oswald, sans-serif" fontSize="9" fontWeight="600" fill="#171717">{i}</text>
+            ))}
+
+            {/* active marker — spans both scales */}
             <line x1="6" y1={cursorY} x2={BLADE_X1 + 4} y2={cursorY}
               stroke="var(--amber)" strokeWidth="1.6" />
             <circle cx={BLADE_X0} cy={cursorY} r="5.5" fill="var(--amber)" stroke="#0c0d0e" strokeWidth="1.4" />
             <g>
-              <rect x="4" y={cursorY - 11} width="52" height="22" rx="5" fill="#0c0d0e" stroke="var(--amber-deep)" strokeWidth="1" />
-              <text x="30" y={cursorY + 4.5} textAnchor="middle"
-                fontFamily="IBM Plex Mono, monospace" fontSize="11" fontWeight="600" fill="var(--amber)">
+              <rect x="2" y={cursorY - 14} width="44" height="28" rx="5" fill="#0c0d0e" stroke="var(--amber-deep)" strokeWidth="1" />
+              <text x="24" y={cursorY - 2} textAnchor="middle"
+                fontFamily="IBM Plex Mono, monospace" fontSize="10.5" fontWeight="600" fill="var(--amber)">
                 {fracPart === 0 && inches >= 1 ? "1" : nearestFraction(fracPart)}
+              </text>
+              <text x="24" y={cursorY + 9} textAnchor="middle"
+                fontFamily="IBM Plex Mono, monospace" fontSize="8" fill="var(--steel)">
+                {roundHalfUp(fracPart * MM, 1)} mm
               </text>
             </g>
           </svg>
@@ -359,10 +403,9 @@ export default function BenchRule() {
             {wholeInches >= 1 ? `${wholeInches} in + ` : ""}drag or arrow-key<br />to graduate
           </div>
         </section>
-      </div>
 
-      {/* reference table */}
-      <section className="br-card br-table-card">
+        {/* reference table — beside the rule so both stay in view */}
+        <section className="br-card br-table-card">
         <div className="br-table-head">
           <span className="t">Quick reference</span>
           <span className="d" />
@@ -381,7 +424,8 @@ export default function BenchRule() {
             );
           })}
         </div>
-      </section>
+        </section>
+      </div>
 
       <p className="br-foot">
         <b>1 inch = 25.4 mm, exact.</b> Decimal inches shown to 4 places, millimetres to 3, rounded half-up
