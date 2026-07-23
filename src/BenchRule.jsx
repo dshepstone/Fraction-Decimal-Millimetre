@@ -314,6 +314,13 @@ export default function BenchRule() {
   const cursorX = xOf(cursorFrac);
   const idx = (len) => Array.from({ length: len }, (_, i) => i);
 
+  /* marker readout pill — sized to its text so nothing overflows */
+  const pillFrac = fracPart === 0 && inches >= 1 ? "1" : nearestFraction(fracPart);
+  const pillText = `${pillFrac}″ · ${roundHalfUp(fracPart * MM, 1)} mm`;
+  const pillW = Math.max(92, Math.round(pillText.length * 7.4 + 24));
+  const pillHalf = pillW / 2;
+  const pillX = clamp(cursorX, LEFT + pillHalf, RIGHT - pillHalf);
+
   const deltaText = exact
     ? "On grid — exact 1/64 graduation."
     : `Off nearest 1/64 by ${dInch >= 0 ? "+" : "\u2212"}${roundHalfUp(Math.abs(dInch), 4)} in \u00b7 ${dInch >= 0 ? "+" : "\u2212"}${roundHalfUp(Math.abs(dInch) * MM, 3)} mm \u00b7 ${dInch >= 0 ? "+" : "\u2212"}${roundHalfUp(Math.abs(dInch) * 1000, 1)} thou`;
@@ -477,11 +484,11 @@ export default function BenchRule() {
             {/* ---------- active red marker ---------- */}
             <line x1={cursorX} y1="88" x2={cursorX} y2={VB_H - 34} stroke="var(--marker)" strokeWidth="2.4" />
             <polygon points={`${cursorX - 6},${MAIN_Y - 1} ${cursorX + 6},${MAIN_Y - 1} ${cursorX},${MAIN_Y + 9}`} fill="var(--marker)" />
-            <g transform={`translate(${clamp(cursorX, LEFT + 30, RIGHT - 30)}, ${VB_H - 20})`}>
-              <rect x="-46" y="-13" width="92" height="26" rx="6" fill="#fff" stroke="var(--marker)" strokeWidth="1.4" />
+            <g transform={`translate(${pillX}, ${VB_H - 20})`}>
+              <rect x={-pillHalf} y="-13" width={pillW} height="26" rx="6" fill="#fff" stroke="var(--marker)" strokeWidth="1.4" />
               <text x="0" y="5" textAnchor="middle"
                 fontFamily="IBM Plex Mono, monospace" fontSize="12" fontWeight="600" fill="#c0271c">
-                {(fracPart === 0 && inches >= 1 ? "1" : nearestFraction(fracPart))}″ · {roundHalfUp(fracPart * MM, 1)} mm
+                {pillText}
               </text>
             </g>
           </svg>
