@@ -125,6 +125,13 @@ const STYLES = `
 .br-chart img{display:block;width:100%;height:auto;border-radius:10px;
   background:#fff;padding:14px;border:1px solid var(--hair);}
 .br-chart figcaption{margin-top:10px;font-size:11.5px;color:var(--steel);line-height:1.5;}
+.br-cite{margin:10px 0 0;padding-left:1.6em;text-indent:-1.6em;font-size:11px;
+  color:var(--steel-dim);line-height:1.55;word-break:break-word;}
+.br-cite i{font-style:italic;color:var(--steel);}
+.br-cite a{color:var(--steel);text-decoration:underline;text-underline-offset:2px;}
+.br-cite a:hover{color:var(--amber);}
+.br-cite-k{display:inline-block;text-indent:0;margin-right:7px;font-family:'Oswald',sans-serif;
+  text-transform:uppercase;letter-spacing:.12em;font-size:9px;color:var(--steel-dim);}
 
 /* table */
 .br-table-card{max-width:940px;margin:16px auto 0;}
@@ -547,6 +554,13 @@ export default function BenchRule() {
           <figure className="br-chart">
             <img src={rulerChart} alt="One-inch ruler chart showing eighth and sixteenth inch fractions with their decimal-inch equivalents from 0 to 1 inch." loading="lazy" />
             <figcaption>Fraction, sixteenth, and decimal-inch equivalents across a single inch — the same graduations the interactive rule above steps through.</figcaption>
+            <p className="br-cite">
+              <span className="br-cite-k">Source (APA)</span>
+              Sermitsiaq. (n.d.). <i>Fraction ruler printable</i>. Retrieved July 23, 2026, from{" "}
+              <a href="https://old.sermitsiaq.ag/en/fraction-ruler-printable.html" target="_blank" rel="noopener noreferrer">
+                https://old.sermitsiaq.ag/en/fraction-ruler-printable.html
+              </a>
+            </p>
           </figure>
         </section>
       </div>
