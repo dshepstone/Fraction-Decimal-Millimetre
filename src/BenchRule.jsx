@@ -1,5 +1,6 @@
 import React, { useState, useRef, useCallback } from "react";
 import { Minus, Plus, Ruler } from "lucide-react";
+import rulerChart from "../ruler_1-inch.jpg";
 
 /* ------------------------------------------------------------------ *
  * Bench Rule — fraction / decimal-inch / millimetre converter
@@ -118,6 +119,12 @@ const STYLES = `
   background:#1b6fb3;border:2px solid #f6f4ec;cursor:pointer;}
 .br-zoom-ticks{display:flex;justify-content:space-between;font-size:8px;color:#a89f89;
   margin-top:5px;font-family:'IBM Plex Mono',monospace;}
+
+/* printed reference chart */
+.br-chart{margin:0;}
+.br-chart img{display:block;width:100%;height:auto;border-radius:10px;
+  background:#fff;padding:14px;border:1px solid var(--hair);}
+.br-chart figcaption{margin-top:10px;font-size:11.5px;color:var(--steel);line-height:1.5;}
 
 /* table */
 .br-table-card{max-width:940px;margin:16px auto 0;}
@@ -528,6 +535,19 @@ export default function BenchRule() {
             );
           })}
         </div>
+        </section>
+
+        {/* printed reference chart the interactive rule is modelled on */}
+        <section className="br-card br-chart-card">
+          <div className="br-table-head">
+            <span className="t">Printed reference chart</span>
+            <span className="d" />
+            <span className="n">0–1″ · sixteenths</span>
+          </div>
+          <figure className="br-chart">
+            <img src={rulerChart} alt="One-inch ruler chart showing eighth and sixteenth inch fractions with their decimal-inch equivalents from 0 to 1 inch." loading="lazy" />
+            <figcaption>Fraction, sixteenth, and decimal-inch equivalents across a single inch — the same graduations the interactive rule above steps through.</figcaption>
+          </figure>
         </section>
       </div>
 
