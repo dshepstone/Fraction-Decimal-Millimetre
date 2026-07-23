@@ -14,6 +14,7 @@ const STYLES = `
   --steel:#8b939d; --steel-dim:#606771; --bone:#e7e4dc; --bone-dim:#b9b6ad;
   --amber:#f2c84b; --amber-deep:#d9a520; --amber-soft:rgba(242,200,75,0.14);
   --blade:#f0c33f;
+  --marker:#ff453a; --marker-soft:rgba(255,69,58,0.16);
   font-family:'IBM Plex Mono',ui-monospace,monospace;
   background:var(--graphite);
   color:var(--bone);
@@ -106,6 +107,24 @@ const STYLES = `
 .br-rule-svg:focus-visible{filter:drop-shadow(0 0 3px var(--amber));}
 .br-rule-hint{font-size:10px;color:var(--steel-dim);text-align:center;margin-top:8px;line-height:1.4;}
 
+/* zoom control */
+.br-zoom{width:100%;max-width:200px;margin:12px 0 2px;}
+.br-zoom-head{display:flex;align-items:baseline;justify-content:space-between;
+  font-family:'Oswald',sans-serif;text-transform:uppercase;letter-spacing:.14em;
+  font-size:9px;color:var(--steel);margin-bottom:7px;}
+.br-zoom-head b{color:var(--amber);font-weight:600;font-size:11px;letter-spacing:.04em;}
+.br-zoom input[type="range"]{width:100%;-webkit-appearance:none;appearance:none;
+  height:4px;border-radius:3px;background:var(--panel2);border:1px solid var(--hair);
+  outline:none;cursor:pointer;margin:0;}
+.br-zoom input[type="range"]:focus-visible{border-color:var(--amber-deep);}
+.br-zoom input[type="range"]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;
+  width:16px;height:16px;border-radius:50%;background:var(--amber);border:2px solid #0c0d0e;
+  cursor:pointer;box-shadow:0 0 6px var(--amber-soft);}
+.br-zoom input[type="range"]::-moz-range-thumb{width:16px;height:16px;border-radius:50%;
+  background:var(--amber);border:2px solid #0c0d0e;cursor:pointer;}
+.br-zoom-ticks{display:flex;justify-content:space-between;font-size:8px;color:var(--steel-dim);
+  margin-top:5px;font-family:'IBM Plex Mono',monospace;}
+
 /* table */
 .br-table-card{max-width:940px;margin:16px auto 0;}
 .br-table-head{display:flex;align-items:center;gap:10px;margin-bottom:14px;}
@@ -188,7 +207,15 @@ const VB_W = 210, VB_H = 780, TOP = 30, BOT = 752, SPAN = BOT - TOP;
 const BLADE_X0 = 50, BLADE_X1 = 176, CENTER = 113;
 const INCH_LBL_X = CENTER + 30;   // right-aligned inch fraction labels
 const MM_LBL_X = CENTER - 29;     // left-aligned millimetre labels
-const yOf = (frac) => TOP + frac * SPAN;
+const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+
+/* label a 64th index as a reduced inch fraction */
+function inchFractionLabel(i) {
+  if (i <= 0) return "0";
+  if (i >= 64) return "1";
+  const g = gcd(i, 64);
+  return `${i / g}/${64 / g}`;
+}
 
 function inchTickLen(i) {
   if (i % 64 === 0) return 31;
@@ -204,17 +231,15 @@ function mmTickLen(i) {
   if (i % 5 === 0) return 21;
   return 11;
 }
-const EIGHTHS = [[0,"0"],[8,"1/8"],[16,"1/4"],[24,"3/8"],[32,"1/2"],
-  [40,"5/8"],[48,"3/4"],[56,"7/8"],[64,"1"]];
-const MM_LABELS = [0, 5, 10, 15, 20, 25];
-
 /* ================================================================== */
 export default function BenchRule() {
   const [inches, setInches] = useState(0.375);
   const [snap, setSnap] = useState(true);
+  const [zoom, setZoom] = useState(1); // 1× shows the full 0–1″; higher spreads the graduations
   const [editing, setEditing] = useState(null); // {field, text}
   const svgRef = useRef(null);
   const dragging = useRef(false);
+  const frozenView = useRef(null); // view window top, held steady while dragging
 
   const commit = (v) => { setInches(Math.max(0, v)); setEditing(null); };
 
@@ -238,23 +263,51 @@ export default function BenchRule() {
     const el = svgRef.current; if (!el) return;
     const rect = el.getBoundingClientRect();
     const localY = ((clientY - rect.top) / rect.height) * VB_H;
-    let frac = Math.min(1, Math.max(0, (localY - TOP) / SPAN));
+    const windowSpan = 1 / zoom;
+    const fp = inches - Math.floor(inches);
+    // hold the visible window steady during a drag so the blade tracks 1:1
+    const vs = dragging.current && frozenView.current != null
+      ? frozenView.current
+      : clamp(fp - windowSpan / 2, 0, 1 - windowSpan);
+    let frac = clamp(vs + ((localY - TOP) / SPAN) * windowSpan, 0, 1);
     if (snap) frac = Math.round(frac * 64) / 64;
     const whole = Math.floor(inches);
     commit(whole + frac);
-  }, [snap, inches]);
+  }, [snap, inches, zoom]);
 
-  const onPointerDown = (e) => { dragging.current = true; e.currentTarget.setPointerCapture(e.pointerId); setFromClientY(e.clientY); };
+  const onPointerDown = (e) => {
+    dragging.current = true;
+    const windowSpan = 1 / zoom;
+    const fp = inches - Math.floor(inches);
+    frozenView.current = clamp(fp - windowSpan / 2, 0, 1 - windowSpan);
+    e.currentTarget.setPointerCapture(e.pointerId);
+    setFromClientY(e.clientY);
+  };
   const onPointerMove = (e) => { if (dragging.current) setFromClientY(e.clientY); };
-  const onPointerUp = () => { dragging.current = false; };
+  const onPointerUp = () => { dragging.current = false; frozenView.current = null; };
   const onKey = (e) => {
     if (e.key === "ArrowUp" || e.key === "ArrowRight") { step(1); e.preventDefault(); }
     if (e.key === "ArrowDown" || e.key === "ArrowLeft") { step(-1); e.preventDefault(); }
   };
 
   const fracPart = inches - Math.floor(inches);
-  const cursorY = yOf(Math.min(1, fracPart === 0 && inches >= 1 ? 1 : fracPart));
   const wholeInches = Math.floor(inches + 1e-9);
+
+  /* visible window of the 0–1″ scale, centred on the cursor when zoomed */
+  const windowSpan = 1 / zoom;
+  const viewStart = dragging.current && frozenView.current != null
+    ? frozenView.current
+    : clamp(fracPart - windowSpan / 2, 0, 1 - windowSpan);
+  const viewEnd = viewStart + windowSpan;
+  const yOf = (frac) => TOP + ((frac - viewStart) / windowSpan) * SPAN;
+  const inView = (frac) => frac >= viewStart - 1e-9 && frac <= viewEnd + 1e-9;
+
+  /* denser labelling as the rule is magnified */
+  const inchLabelStep = zoom >= 6 ? 1 : zoom >= 4 ? 2 : zoom >= 2 ? 4 : 8; // in 64ths
+  const mmLabelStep = zoom >= 4 ? 1 : zoom >= 2 ? 2 : 5;                    // in mm
+
+  const cursorFrac = Math.min(1, fracPart === 0 && inches >= 1 ? 1 : fracPart);
+  const cursorY = yOf(cursorFrac);
 
   const deltaText = exact
     ? "On grid — exact 1/64 graduation."
@@ -361,34 +414,40 @@ export default function BenchRule() {
 
             {/* inch graduations (right) */}
             {Array.from({ length: 65 }, (_, i) => {
+              if (!inView(i / 64)) return null;
               const y = yOf(i / 64);
               const len = inchTickLen(i);
               return <line key={`in${i}`} x1={BLADE_X1 - len} y1={y} x2={BLADE_X1} y2={y}
                 stroke="#171717" strokeWidth={i % 8 === 0 ? 1.6 : 0.9} />;
             })}
-            {EIGHTHS.map(([i, lbl]) => (
-              <text key={`inl${lbl}`} x={INCH_LBL_X} y={yOf(i / 64) + 3.2} textAnchor="end"
-                fontFamily="Oswald, sans-serif" fontSize="9" fontWeight="600" fill="#171717">{lbl}</text>
-            ))}
+            {Array.from({ length: 65 }, (_, i) => i)
+              .filter((i) => i % inchLabelStep === 0 && inView(i / 64))
+              .map((i) => (
+                <text key={`inl${i}`} x={INCH_LBL_X} y={yOf(i / 64) + 3.2} textAnchor="end"
+                  fontFamily="Oswald, sans-serif" fontSize="9" fontWeight="600" fill="#171717">{inchFractionLabel(i)}</text>
+              ))}
 
             {/* millimetre graduations (left) */}
             {Array.from({ length: 26 }, (_, i) => {
+              if (!inView(i / MM)) return null;
               const y = yOf(i / MM);
               const len = mmTickLen(i);
               return <line key={`mm${i}`} x1={BLADE_X0} y1={y} x2={BLADE_X0 + len} y2={y}
                 stroke="#171717" strokeWidth={i % 10 === 0 ? 1.6 : 0.9} />;
             })}
-            {MM_LABELS.map((i) => (
-              <text key={`mml${i}`} x={MM_LBL_X} y={yOf(i / MM) + 3.2} textAnchor="start"
-                fontFamily="Oswald, sans-serif" fontSize="9" fontWeight="600" fill="#171717">{i}</text>
-            ))}
+            {Array.from({ length: 26 }, (_, i) => i)
+              .filter((i) => i % mmLabelStep === 0 && inView(i / MM))
+              .map((i) => (
+                <text key={`mml${i}`} x={MM_LBL_X} y={yOf(i / MM) + 3.2} textAnchor="start"
+                  fontFamily="Oswald, sans-serif" fontSize="9" fontWeight="600" fill="#171717">{i}</text>
+              ))}
 
-            {/* active marker — spans both scales */}
+            {/* active marker — spans both scales, red for high contrast */}
             <line x1="6" y1={cursorY} x2={BLADE_X1 + 4} y2={cursorY}
-              stroke="var(--amber)" strokeWidth="1.6" />
-            <circle cx={BLADE_X0} cy={cursorY} r="5.5" fill="var(--amber)" stroke="#0c0d0e" strokeWidth="1.4" />
+              stroke="var(--marker)" strokeWidth="2.2" />
+            <circle cx={BLADE_X0} cy={cursorY} r="5.5" fill="var(--marker)" stroke="#0c0d0e" strokeWidth="1.4" />
             <g>
-              <rect x="2" y={cursorY - 14} width="44" height="28" rx="5" fill="#0c0d0e" stroke="var(--amber-deep)" strokeWidth="1" />
+              <rect x="2" y={cursorY - 14} width="44" height="28" rx="5" fill="#0c0d0e" stroke="var(--marker)" strokeWidth="1" />
               <text x="24" y={cursorY - 2} textAnchor="middle"
                 fontFamily="IBM Plex Mono, monospace" fontSize="10.5" fontWeight="600" fill="var(--amber)">
                 {fracPart === 0 && inches >= 1 ? "1" : nearestFraction(fracPart)}
@@ -401,6 +460,17 @@ export default function BenchRule() {
           </svg>
           <div className="br-rule-hint">
             {wholeInches >= 1 ? `${wholeInches} in + ` : ""}drag or arrow-key<br />to graduate
+          </div>
+
+          <div className="br-zoom">
+            <div className="br-zoom-head">
+              <span>Zoom</span>
+              <b>{zoom}× · to {inchFractionLabel(inchLabelStep)}″</b>
+            </div>
+            <input type="range" min="1" max="8" step="1" value={zoom}
+              onChange={(e) => setZoom(Number(e.target.value))}
+              aria-label="Rule zoom — spreads the graduations to reveal finer fractions" />
+            <div className="br-zoom-ticks"><span>1×</span><span>8×</span></div>
           </div>
         </section>
 
